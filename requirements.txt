@@ -1,0 +1,16 @@
+transformers
+langchain
+huggingface_hub
+huggingface
+urllib3<2.0
+ipywidgets
+torch
+sentencepiece
+joblib
+openai
+python-dotenv
+pypdf
+chromadb
+tiktoken
+streamlit
+watchdog
