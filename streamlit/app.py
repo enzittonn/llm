@@ -12,6 +12,12 @@ from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter, CharacterTextSplitter
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.vectorstores import Chroma
+from knowledgebase import MyKnowledgeBase
+from knowledgebase import (
+    DOCUMENT_SOURCE_DIRECTORY
+)
+from langchain.chains import RetrievalQA
+
 
 
 from dotenv import load_dotenv, find_dotenv
@@ -22,13 +28,13 @@ params = st.experimental_get_query_params()
 st.experimental_set_query_params()
 
 
-st.title('🦜🔗 F-Chat')
+st.title('🦜🔗 Folksam LLM Playground')
 
 # openai_api_key = st.sidebar.text_input('OpenAI API Key', type='password')
 
-# def generate_response(input_text):
-#     llm = OpenAI(temperature=0.2, openai_api_key=os.environ['OPENAI_API_KEY'])
-#     st.info(llm(input_text))
+def generate_response(input_text):
+    llm = OpenAI(temperature=0.2, openai_api_key=os.environ['OPENAI_API_KEY'])
+    st.info(llm(input_text))
 
 # with st.form('my_form'):
 #     text = st.text_area('Enter text:', 'What are the three key pieces of advice for learning how to code?')
@@ -41,46 +47,48 @@ st.title('🦜🔗 F-Chat')
 
 
 
-################# Functions
-    ############# Modules
-def get_pdf_text(pdf_docs):
-    text = ""
-    for pdf in pdf_docs:
-        pdf_reader = PdfReader(pdf)
-        for page in pdf_reader.pages:
-            text += page.extract_text()
-    return text
+# ################# Functions
+#     ############# Modules
+# def get_pdf_text(pdf_docs):
+#     text = ""
+#     for pdf in pdf_docs:
+#         pdf_reader = PdfReader(pdf)
+#         for page in pdf_reader.pages:
+#             text += page.extract_text()
+#     return text
         
 
-def text_splitter(text, chunk_size=850, chunk_overlap=150, splitter=RecursiveCharacterTextSplitter()):
-    # TODO: Split text into chunks
-    # Chunks should be passed from Streamlit to the model
-    # Splitting method should be chosen by user
-    if splitter == 'RecursiveCharacterTextSplitter':
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            separators=["\n"],
-            length_function=len
-        )
+# def text_splitter(text, chunk_size=850, chunk_overlap=150, splitter=RecursiveCharacterTextSplitter()):
+#     # TODO: Split text into chunks
+#     # Chunks should be passed from Streamlit to the model
+#     # Splitting method should be chosen by user
+#     if splitter == 'RecursiveCharacterTextSplitter':
+#         splitter = RecursiveCharacterTextSplitter(
+#             chunk_size=chunk_size,
+#             chunk_overlap=chunk_overlap,
+#             separators=["\n"],
+#             length_function=len
+#         )
     
-    rc_splitter = splitter.split_text(text)
-    return rc_splitter
+#     rc_splitter = splitter.split_text(text)
+#     return rc_splitter
    
     
-def get_vectorstore(text_chunks):
-    embeddings = OpenAIEmbeddings()
-    # embeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl")
-    vectorstore = Chroma.from_texts(texts=text_chunks, embedding=embeddings)
-    return vectorstore
+# def get_vectorstore(text_chunks):
+#     embeddings = OpenAIEmbeddings()
+#     # embeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl")
+#     vectorstore = Chroma.from_texts(texts=text_chunks, embedding=embeddings)
+#     return vectorstore
 
 
-def retrieve():
-    return  None
+# def retrieve(prompt, vectorstore, k=5, similarity_measure="mmr"):
+#     docs = vectorstore.retrieve(prompt, k=k, similarity_measure=similarity_measure)
+#     return  docs
 
 
-def chat():
-    return None
+# def chat(docs):
+    
+#     return None
         
 
 
@@ -107,14 +115,20 @@ def main():
                 st.session_state.model_type = unquote(params["model_type"][0])
             
             ## Upload file
-            uploaded_file = st.file_uploader("Choose a file", accept_multiple_files=True)
+            uploaded_file = st.file_uploader("Choose a file", type=['pdf'])
+            
             if st.button('Process'):
                 with st.spinner("Processing"):
-                    raw_text = get_pdf_text(uploaded_file)
-                    # st.write(raw_text)
+                    if uploaded_file is not None:
+                        st.write(type(uploaded_file))
+                        # kb = MyKnowledgeBase(uploaded_file)
+                        # if kb.initiate_document_injetion_pipeline(uploaded_file):
+                        #     st.write('Done')                    
+                    # raw_text = get_pdf_text(uploaded_file)
+                    # # st.write(raw_text)
                     
-                    text_chunks = text_splitter(raw_text)
-                    st.write(len(text_chunks[6]))
+                    # text_chunks = text_splitter(raw_text)
+                    # st.write(len(text_chunks[6]))
             
                 
             model_type = st.selectbox("Modelltyp", MODEL_TYPES, key="model_type")
@@ -157,7 +171,7 @@ def main():
                 variable_count = st.number_input("Add Variable", step=1, min_value=1, max_value=10, value=variable_count)
             elif model_type == "OpenAI Chat":
                 instruction_count = st.number_input("Add System Message", step=1, min_value=1, max_value=5)
-                prompt_count = st.number_input("Add User Message", step=1, min_value=1, max_value=10)
+                prompt_count = st.number_input("Add User Message (fråga)", step=1, min_value=1, max_value=10)
             else:
                 instruction_count = st.number_input("Add Instruction", step=1, min_value=1, max_value=5)
                 prompt_count = st.number_input("Add Prompt", step=1, min_value=1, max_value=10)
@@ -224,14 +238,14 @@ def main():
             instruction = st.text_area(
                 "System Message",
                 key="instruction",
-                value=["instruction"][0] if "instruction" in params else "Du är en hjälpsam chattbot",
+                value=["instruction"][0] if "instruction" in params else "Du är en hjälpsam kundservice chattbot för en försäkringsbolag.",
             )
             
         elif model_type == "HuggingFace Hub":
             instruction = st.text_area(
                 "Instruction",
                 key="instruction",
-                value=params["instruction"][0] if "instruction" in params else "You are a helpful AI assistant.",
+                value=params["instruction"][0] if "instruction" in params else "Du är en hjälpsam kundservice chattbot för en försäkringsbolag.",
             )
             
         
@@ -250,7 +264,7 @@ def main():
                     st.text_area(
                         "Prompt Template",
                         key=f"col_{j-variable_count}",
-                        value=params["template"][0] if "template" in params else "",
+                        value=params["template"][0] if "template" in params else "Använd följande delar av sammanhanget för att svara på frågan i slutet. Om du inte vet svaret, säg bara att du inte vet, försök inte hitta på ett svar. Använd maximalt tre meningar. Håll svaret så kortfattat och enkelt att förstå. {{sammanhanget}}?",
                     )
                 )
         
@@ -273,20 +287,33 @@ def main():
             st.divider()
             
         
+        # Handle user input
+        user_question = st.text_input("Ask a question about your documents:")
+        # with st.form('my_form'):
+        #     text = st.text_area('Enter text:', 'What are the three key pieces of advice for learning how to code?')
+        #     submitted = st.form_submit_button('Submit')
+        #     if submitted:
+        #         generate_response(text)
+        
+
+        
         ## Buttons
         run_button, clear_button, share_button = st.columns([1, 1, 1], gap="small")
         with run_button:
             run = st.button("Kör")
         with clear_button:
             clear = st.button("Rensa")
-        with share_button:
-            share = st.button("Dela")
             
             
         #### Link
         
         
-        
+        if run:
+            prompts = render_prompts(templates, vars)
+            generate_response(prompts[0])
+            # st.write(prompts)
+
+            
         
         
         # ## Run
