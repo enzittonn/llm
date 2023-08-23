@@ -8,10 +8,20 @@ from langchain.embeddings import GPT4AllEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 
-CHROMA_DB_DIRECTORY='..data/chroma'
-DOCUMENT_SOURCE_DIRECTORY='../data/Fastighet.pdf'
+
+##### External imports #####
+from PyPDF2 import PdfReader
+from langchain.document_loaders import PyPDFLoader
+from langchain.vectorstores import FAISS
+from langchain.embeddings.openai import OpenAIEmbeddings
+
+#####
+
+
+CHROMA_DB_DIRECTORY='data/chroma'
+DOCUMENT_SOURCE_DIRECTORY='data/files/Fastighet.pdf'
 CHROMA_SETTINGS = Settings(
-    # chroma_db_impl='duckdb+parquet',
+    chroma_db_impl='duckdb+parquet',
     persist_directory=CHROMA_DB_DIRECTORY,
     anonymized_telemetry=False
 )
@@ -20,7 +30,7 @@ CHUNK_SIZE=500
 CHUNK_OVERLAP=50
 HIDE_SOURCE_DOCUMENTS=False
 
-class MyKnowledgeBase:
+class KnowledgeBase:
     def __init__(self, pdf_source_folder_path: str) -> None:
         """
         Loads pdf and creates a Knowledge base using the Chroma
@@ -31,12 +41,18 @@ class MyKnowledgeBase:
         """
         self.pdf_source_folder_path = pdf_source_folder_path
 
-    def load_pdfs(self):
+    def load_directory(self):
         loader = DirectoryLoader(
             self.pdf_source_folder_path
         )
         loaded_pdfs = loader.load()
         return loaded_pdfs
+    
+    # Works - returns
+    def langchain_pdf_loader(self):
+        loader = PyPDFLoader(self.pdf_source_folder_path)
+        pages = loader.load()
+        return pages
 
     def split_documents(
         self,
@@ -49,18 +65,40 @@ class MyKnowledgeBase:
         chunked_docs = splitter.split_documents(loaded_docs)
         return chunked_docs
 
-    def convert_document_to_embeddings(
+
+
+
+    # Does not work - fix
+    def convert_document_to_FAISS_embeddings(
         self, chunked_docs, embedder
     ):
-        vector_db = Chroma(
-            persist_directory=CHROMA_DB_DIRECTORY,
-            embedding_function=embedder,
-            client_settings=CHROMA_SETTINGS,
-        )
+        faiss_db = FAISS.afrom_documents(self, chunked_docs, embedder)
+        faiss_db.save_local('data/faiss/faiss_index')
+        
+        return faiss_db
+    
 
-        vector_db.add_documents(chunked_docs)
-        vector_db.persist()
-        return vector_db
+
+    
+    
+    # # NO Working
+    # def convert_document_to_chroma_embeddings(
+    #     self, chunked_docs, embedder
+    # ):
+    #     vector_db = Chroma.from_documents(
+    #         persist_directory=CHROMA_DB_DIRECTORY,
+    #         embedding=embedder,
+    #         documents=chunked_docs,
+    #         client_settings=CHROMA_SETTINGS,
+    #     )
+
+    #     vector_db.add_documents(chunked_docs)
+    #     vector_db.persist()
+    #     return vector_db
+
+
+
+
 
     def return_retriever_from_persistant_vector_db(
         self, embedder
@@ -81,13 +119,13 @@ class MyKnowledgeBase:
         )
 
     def initiate_document_injetion_pipeline(self):
-        loaded_pdfs = self.load_pdfs()
+        loaded_pdfs = self.langchain_pdf_loader()
         chunked_documents = self.split_documents(loaded_docs=loaded_pdfs)
         
         print("=> PDF loading and chunking done.")
 
-        embeddings = GPT4AllEmbeddings()
-        vector_db = self.convert_document_to_embeddings(
+        embeddings = OpenAIEmbeddings()
+        vector_db = self.convert_document_to_chroma_embeddings(
             chunked_docs=chunked_documents, embedder=embeddings
         )
 

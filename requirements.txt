@@ -14,3 +14,14 @@ chromadb
 tiktoken
 streamlit
 watchdog
+prompttools
+jinja2
+# llama-cpp-python
+# anthropic
+pyperclip
+google-generativeai
+tenacity
+sentry_sdk
+unstructured
+PyPDF2
+faiss-cpu
